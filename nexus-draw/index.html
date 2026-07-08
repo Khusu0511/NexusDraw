@@ -320,14 +320,30 @@ let bot = null, predLoop = null, cdTimer = null
 
 async function runPred() {
   if (!tfModel) return []
+  const src = cv()
+  // Step 1: Create square canvas preserving aspect ratio (840x540 -> square)
+  const side = Math.max(CW, CH)
+  const sq = document.createElement('canvas'); sq.width = sq.height = side
+  const sqCtx = sq.getContext('2d')
+  sqCtx.fillStyle = '#fff'
+  sqCtx.fillRect(0, 0, side, side)
+  sqCtx.drawImage(src, (side - CW) / 2, (side - CH) / 2)
+  // Step 2: Scale down to 28x28
   const tmp = document.createElement('canvas'); tmp.width = tmp.height = 28
-  tmp.getContext('2d').drawImage(cv(), 0, 0, 28, 28)
-  const d = tmp.getContext('2d').getImageData(0, 0, 28, 28).data
-  const px = new Float32Array(28*28)
-  for (let i = 0; i < 28*28; i++) px[i] = d[i*4]/255
-  const t = tf.tensor4d(px,[1,28,28,1]), out = tfModel.predict(t)
+  const tCtx = tmp.getContext('2d')
+  tCtx.drawImage(sq, 0, 0, 28, 28)
+  // Step 3: Proper grayscale conversion + invert (model expects white-on-black)
+  const d = tCtx.getImageData(0, 0, 28, 28).data
+  const px = new Float32Array(28 * 28)
+  for (let i = 0; i < 28 * 28; i++) {
+    const r = d[i*4], g = d[i*4+1], b = d[i*4+2]
+    const gray = (0.299*r + 0.587*g + 0.114*b) / 255
+    px[i] = 1.0 - gray  // invert: white bg -> 0, dark strokes -> 1
+  }
+  const t = tf.tensor4d(px, [1, 28, 28, 1])
+  const out = tfModel.predict(t)
   const p = await out.data(); t.dispose(); out.dispose()
-  return CATS.map((cat,i) => ({ cat, p:p[i] })).sort((a,b) => b.p-a.p)
+  return CATS.map((cat, i) => ({ cat, p: p[i] })).sort((a, b) => b.p - a.p)
 }
 
 function startPredLoop() {
@@ -337,21 +353,27 @@ function startPredLoop() {
     if (S.phase !== 'drawing') return
     const preds = await runPred()
     if (!preds.length) return
+    // Always update the AI detector chip for the drawer
     if (S.isDrawer) {
       const chip = qs('#ai-chip')
-      chip.textContent = `🤖 ${preds[0].cat}`
+      chip.textContent = `🤖 ${preds[0].cat} ${Math.round(preds[0].p*100)}%`
       chip.classList.add('show')
-    } else if (bot && !bot.hasGuessed && bot.id !== S.botDrawerId) {
-      const top = preds[0]
+    }
+    // Bot guessing logic (only when bot exists and is not the drawer)
+    if (bot && !bot.hasGuessed && bot.id !== S.botDrawerId) {
       const now = Date.now()
-      if (top.p >= 0.38 && now - (bot.lastGuess||0) >= 7000 && !(bot.wrong||[]).includes(top.cat)) {
-        bot.lastGuess = now
-        if (!bot.wrong) bot.wrong = []
-        bot.wrong.push(top.cat)
-        socket.emit('bot-guess', { botId: bot.id, guess: top.cat })
+      if (now - (bot.lastGuess||0) >= 5000) {
+        // Try the best prediction that hasn't been guessed wrong yet
+        const pick = preds.find(p => p.p >= 0.25 && !(bot.wrong||[]).includes(p.cat))
+        if (pick) {
+          bot.lastGuess = now
+          if (!bot.wrong) bot.wrong = []
+          bot.wrong.push(pick.cat)
+          socket.emit('bot-guess', { botId: bot.id, guess: pick.cat })
+        }
       }
     }
-  }, 1600)
+  }, 1200)
 }
 
 function stopPredLoop() {
@@ -414,7 +436,7 @@ socket.on('hint-init', ({hint, wordLen, isBotDrawing}) => {
   const bd = qs('#dbadge'); bd.style.display = isBotDrawing ? '' : 'none'
   qs('#c-in').placeholder = 'Type your guess…'
   show('s-game'); lockCv(true); initCv()
-  if (!isBotDrawing) startPredLoop()
+  startPredLoop()
 })
 
 socket.on('hint-update', h => qs('#g-hint').textContent = h)
