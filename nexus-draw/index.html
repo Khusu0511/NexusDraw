@@ -531,7 +531,9 @@ cv().addEventListener('mousemove',e=>{
     const c=cv().getContext('2d'); c.beginPath(); c.moveTo(mx1,my1); c.quadraticCurveTo(b.x,b.y,mx2,my2)
     c.strokeStyle=D.tool==='eraser'?'#fff':D.color; c.lineWidth=D.tool==='eraser'?D.size*2:D.size; c.lineCap=c.lineJoin='round'; c.stroke()
   }
-  socket.emit('stroke',{t:'m',x:p.x/CW,y:p.y/CH})
+
+  socket.emit( 'stroke',{t:'m',x:p.x/CW,y:p.y/CH} )
+  
 })
 const stopD = () => { if(!D.active)return; D.active=false; D.pts=[]; socket.emit('stroke',{t:'e'}) }
 cv().addEventListener('mouseup',stopD)
