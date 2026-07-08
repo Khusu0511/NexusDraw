@@ -1,0 +1,16 @@
+# Datasets
+model_training/quickdraw_cache/
+
+# Model files
+*.npy
+*.h5
+*.pt
+*.pth
+*.ckpt
+
+# Node
+node_modules/
+
+# Python
+venv/
+.venv/
