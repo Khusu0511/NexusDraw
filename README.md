@@ -149,6 +149,8 @@ MIT — see [LICENSE](LICENSE).
 ## 👤 Author
 
 **Kushagra Gupta**
+
 Indian Institute of Information Technology, Allahabad
+
 [GitHub](https://github.com/Khusu0511)
 [LinkedIn](https://www.linkedin.com/in/kushagra-gupta-7b49b5302/)
