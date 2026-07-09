@@ -321,24 +321,47 @@ let bot = null, predLoop = null, cdTimer = null
 async function runPred() {
   if (!tfModel) return []
   const src = cv()
-  // Step 1: Create square canvas preserving aspect ratio (840x540 -> square)
-  const side = Math.max(CW, CH)
-  const sq = document.createElement('canvas'); sq.width = sq.height = side
+  // Step 1: Find bounding box of drawn content (non-white pixels)
+  const fd = src.getContext('2d').getImageData(0, 0, CW, CH).data
+  let x0 = CW, y0 = CH, x1 = 0, y1 = 0, found = false
+  for (let y = 0; y < CH; y++) {
+    for (let x = 0; x < CW; x++) {
+      const i = (y * CW + x) * 4
+      if (fd[i] < 235 || fd[i+1] < 235 || fd[i+2] < 235) {
+        x0 = Math.min(x0, x); y0 = Math.min(y0, y)
+        x1 = Math.max(x1, x); y1 = Math.max(y1, y)
+        found = true
+      }
+    }
+  }
+  if (!found) return []
+  // Step 2: Crop drawing, center in a square with padding (like training data)
+  const w = x1 - x0 + 1, h = y1 - y0 + 1
+  const maxDim = Math.max(w, h)
+  const pad = Math.round(maxDim * 0.25)
+  const side = maxDim + pad * 2
+  const sq = document.createElement('canvas')
+  sq.width = sq.height = side
   const sqCtx = sq.getContext('2d')
   sqCtx.fillStyle = '#fff'
   sqCtx.fillRect(0, 0, side, side)
-  sqCtx.drawImage(src, (side - CW) / 2, (side - CH) / 2)
-  // Step 2: Scale down to 28x28
+  sqCtx.drawImage(src, x0, y0, w, h,
+    pad + (maxDim - w) / 2, pad + (maxDim - h) / 2, w, h)
+  // Step 3: Scale to 28x28 (two-step for quality)
+  const mid = document.createElement('canvas')
+  const midSz = Math.min(side, 112)
+  mid.width = mid.height = midSz
+  mid.getContext('2d').drawImage(sq, 0, 0, midSz, midSz)
   const tmp = document.createElement('canvas'); tmp.width = tmp.height = 28
   const tCtx = tmp.getContext('2d')
-  tCtx.drawImage(sq, 0, 0, 28, 28)
-  // Step 3: Proper grayscale conversion + invert (model expects white-on-black)
+  tCtx.drawImage(mid, 0, 0, 28, 28)
+  // Step 4: Grayscale + invert to match training (background=0, strokes=1)
+  // Training used: imgs = 1.0 - raw / 255.0
   const d = tCtx.getImageData(0, 0, 28, 28).data
   const px = new Float32Array(28 * 28)
   for (let i = 0; i < 28 * 28; i++) {
     const r = d[i*4], g = d[i*4+1], b = d[i*4+2]
-    const gray = (0.299*r + 0.587*g + 0.114*b) / 255
-    px[i] = gray  // invert: white bg -> 0, dark strokes -> 1
+    px[i] = 1.0 - (0.299*r + 0.587*g + 0.114*b) / 255
   }
   const t = tf.tensor4d(px, [1, 28, 28, 1])
   const out = tfModel.predict(t)
