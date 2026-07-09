@@ -148,7 +148,7 @@ MIT — see [LICENSE](LICENSE).
 
 ## 👤 Author
 
-**Kushagra Gupta**
+**Kushagra Gupta ( BTech IT )**
 
 Indian Institute of Information Technology, Allahabad
 
