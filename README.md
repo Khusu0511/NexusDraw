@@ -15,7 +15,11 @@
 
 Nexus Draw is a Pictionary-style party game. One player draws a secret word while everyone else — human or AI — races to guess it from the sketch. The twist: the AI opponent isn't calling out to an LLM API. It's a small **convolutional neural network trained from scratch** on Google's [Quick, Draw!](https://quickdraw.withgoogle.com/data) dataset, exported to **TensorFlow.js**, and run **entirely client-side** in every player's browser.
 
-> 📸 <img width="958" height="443" alt="image" src="https://github.com/user-attachments/assets/51f0baa0-b844-467c-a6e6-fe2e5721674d" />
+> 📸 Game Interface <img width="1918" height="889" alt="image" src="https://github.com/user-attachments/assets/c052ce85-d15c-45e2-8481-fccec2fc9609" />
+> 📸 Wating Room <img width="958" height="443" alt="image" src="https://github.com/user-attachments/assets/51f0baa0-b844-467c-a6e6-fe2e5721674d" />
+> 📸 Live Play <img width="1915" height="870" alt="image" src="https://github.com/user-attachments/assets/252fff0e-f724-4430-8b80-cc84b59b1723" />
+<img width="959" height="441" alt="image" src="https://github.com/user-attachments/assets/9d0d6e1b-d762-471b-bb63-82dc7f3ea3ec" />
+> 📸 Leadboard <img width="1918" height="868" alt="image" src="https://github.com/user-attachments/assets/323f01cc-5b6e-48e9-87ce-f87959597ac1" />
 
 
 ## ✨ Features
