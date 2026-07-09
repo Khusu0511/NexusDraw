@@ -338,7 +338,7 @@ async function runPred() {
   for (let i = 0; i < 28 * 28; i++) {
     const r = d[i*4], g = d[i*4+1], b = d[i*4+2]
     const gray = (0.299*r + 0.587*g + 0.114*b) / 255
-    px[i] = 1.0 - gray  // invert: white bg -> 0, dark strokes -> 1
+    px[i] = gray  // invert: white bg -> 0, dark strokes -> 1
   }
   const t = tf.tensor4d(px, [1, 28, 28, 1])
   const out = tfModel.predict(t)
