@@ -1,16 +1,51 @@
 # Datasets
 model_training/quickdraw_cache/
 
-# Model files
+# Model checkpoint files (the exported TF.js model in frontend/public/model/ IS tracked)
 *.npy
 *.h5
+*.keras
 *.pt
 *.pth
 *.ckpt
 
+# Model backup / placeholder files
+frontend/public/model/model.json.bak
+frontend/public/model/.gitkeep
+frontend/public/model/README.txt
+
+# Debug / diagnostic files
+frontend/public/diagnostic.html
+model_training/inspect_weights.py
+model_training/test_forward.py
+model_training/patch_model_json.py
+
 # Node
 node_modules/
+
+# Build output
+frontend/dist/
 
 # Python
 venv/
 .venv/
+__pycache__/
+
+# Environment
+.env
+
+# OS
+.DS_Store
+Thumbs.db
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Test coverage
+coverage/
+
+# Docker
+.docker/

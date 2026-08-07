@@ -4,8 +4,11 @@
 
 [![Live Demo](https://img.shields.io/badge/demo-play_now-8b5cf6?style=flat-square)](https://nexusdraw.onrender.com)
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg?style=flat-square)](LICENSE)
-[![Node](https://img.shields.io/badge/node-%3E%3D18-339933?style=flat-square&logo=node.js&logoColor=white)](nexus-draw/package.json)
-[![TensorFlow.js](https://img.shields.io/badge/TensorFlow.js-4.14-FF6F00?style=flat-square&logo=tensorflow&logoColor=white)](nexus-draw/model)
+[![Node](https://img.shields.io/badge/node-%3E%3D18-339933?style=flat-square&logo=node.js&logoColor=white)](backend/package.json)
+[![React](https://img.shields.io/badge/React-19-61DAFB?style=flat-square&logo=react&logoColor=white)](frontend/package.json)
+[![TensorFlow.js](https://img.shields.io/badge/TensorFlow.js-4.22-FF6F00?style=flat-square&logo=tensorflow&logoColor=white)](frontend/public/model)
+[![Docker](https://img.shields.io/badge/Docker-compose-2496ED?style=flat-square&logo=docker&logoColor=white)](docker-compose.yml)
+[![Tests](https://img.shields.io/badge/tests-jest-C21325?style=flat-square&logo=jest&logoColor=white)](backend/tests)
 
 **[🎮 Play the live demo →](https://nexusdraw.onrender.com)**
 
@@ -16,11 +19,10 @@
 Nexus Draw is a Pictionary-style party game. One player draws a secret word while everyone else — human or AI — races to guess it from the sketch. The twist: the AI opponent isn't calling out to an LLM API. It's a small **convolutional neural network trained from scratch** on Google's [Quick, Draw!](https://quickdraw.withgoogle.com/data) dataset, exported to **TensorFlow.js**, and run **entirely client-side** in every player's browser.
 
 > 📸 Game Interface <img width="1918" height="889" alt="image" src="https://github.com/user-attachments/assets/c052ce85-d15c-45e2-8481-fccec2fc9609" />
-> 📸 Wating Room <img width="958" height="443" alt="image" src="https://github.com/user-attachments/assets/51f0baa0-b844-467c-a6e6-fe2e5721674d" />
+> 📸 Waiting Room <img width="958" height="443" alt="image" src="https://github.com/user-attachments/assets/51f0baa0-b844-467c-a6e6-fe2e5721674d" />
 > 📸 Live Play <img width="1915" height="870" alt="image" src="https://github.com/user-attachments/assets/252fff0e-f724-4430-8b80-cc84b59b1723" />
 <img width="959" height="441" alt="image" src="https://github.com/user-attachments/assets/9d0d6e1b-d762-471b-bb63-82dc7f3ea3ec" />
-> 📸 Leadboard <img width="1918" height="868" alt="image" src="https://github.com/user-attachments/assets/323f01cc-5b6e-48e9-87ce-f87959597ac1" />
-
+> 📸 Leaderboard <img width="1918" height="868" alt="image" src="https://github.com/user-attachments/assets/323f01cc-5b6e-48e9-87ce-f87959597ac1" />
 
 ## ✨ Features
 
@@ -33,66 +35,188 @@ Nexus Draw is a Pictionary-style party game. One player draws a secret word whil
 - 💬 In-round chat with progressive letter-hint reveals
 - 🔌 Zero external AI API keys — the only "AI service" is a ~900 KB model file served as a static asset
 
-## 🧠 How the AI works
+## 🛠️ Tech Stack
 
-1. **Training** (`model_training/nexus_draw_cnn.ipynb`) downloads ~10,000 real doodles per category from the Quick Draw dataset (25 categories, 250,000 drawings total) and trains a compact CNN — three convolutional blocks (32 → 64 → 128 filters) with batch norm and ReLU, max-pooling and dropout, global average pooling, and a dense classification head — using random rotation, zoom, translation, and contrast augmentation so it generalizes across drawing styles. The trained weights are exported straight to TensorFlow.js's layers-model format (`model.json` + a binary weight shard).
-2. **Inference** (`nexus-draw/index.html`) loads the model once with `tf.loadLayersModel()` and keeps it in memory. While someone is drawing, each connected browser periodically finds the drawing's bounding box, crops and pads it into a centered square, downsamples it to 28×28, converts it to grayscale, and runs it through the CNN — mirroring how the training images were prepared.
-3. **The bot "guesses"** by relaying its predictions over the network. `server.js` contains **no ML code at all** — it only tracks room/game state over Socket.io. Whichever non-drawing player's browser is running inference emits a `bot-guess` event on the AI's behalf once its confidence crosses a threshold, and the server scores it exactly like a typed human guess.
+| Layer | Technology |
+|---|---|
+| **Frontend** | React 19, Vite 8, Canvas API |
+| **Backend** | Node.js, Express 4, Socket.io 4 |
+| **AI Inference** | TensorFlow.js 4.22 (client-side) |
+| **ML Training** | Python, TensorFlow/Keras 3, Google Colab |
+| **Containerization** | Docker, docker-compose, Nginx |
+| **Deployment** | Render (Node + WebSocket) |
 
-This keeps the Node server tiny (Express + Socket.io and nothing else) and means there's no inference cost, rate limit, or secret key to manage.
+## 🧠 How the AI Works
 
-## 🗂️ Project structure
+### Training
+
+The CNN is trained in Google Colab using the notebook at `model_training/nexus_draw_cnn.ipynb`. It downloads **50,000 real doodles per category** from the [Quick Draw dataset](https://quickdraw.withgoogle.com/data) (25 categories, 1.25 million drawings total) and trains a compact CNN:
+
+- **Architecture**: Three convolutional blocks (32 → 64 → 128 filters) with batch normalization, ReLU activation, max-pooling, and dropout, followed by global average pooling, a 512-unit dense head with batch norm and dropout, and a 25-class softmax output
+- **Augmentation**: Random rotation (±12°), zoom (±15%), translation (±10%), and contrast (±15%)
+- **Optimizer**: Adam with cosine decay learning rate schedule
+- **Training**: Up to 50 epochs with early stopping (patience=10) and best-model checkpointing
+
+The trained model is exported to TensorFlow.js format using the official `tensorflowjs_converter`, then patched for Keras 2 compatibility so TF.js `loadLayersModel()` can parse it.
+
+### Inference Pipeline
+
+The preprocessing pipeline in `frontend/src/hooks/useAI.js`:
+
+1. **Bounding box detection** — scans the canvas for non-white pixels using min-channel deviation, supporting colored strokes on white backgrounds
+2. **Center-of-mass centering** — positions the drawing by its center of mass (matching the Quick Draw dataset convention) inside a padded square
+3. **Progressive downsampling** — repeatedly halves the image with smooth interpolation (`imageSmoothingEnabled = true`, quality `high`) from ~840px down to 28×28, preserving thin strokes that would be destroyed by a single large resize
+4. **Greyscale inversion** — converts to single-channel using the darkest channel (min of R/G/B), then inverts so strokes are ~1.0 and background is ~0.0, with a light noise floor at 0.05
+5. **TF.js inference** — runs the 28×28×1 tensor through the CNN inside `tf.tidy()` to prevent memory leaks
+
+### Bot Guessing
+
+The bot "guesses" by relaying predictions over the network. The backend contains **no ML code** — it only tracks room/game state over Socket.io. The drawer's browser runs inference and emits a `bot-guess` event on the AI's behalf once confidence crosses an adaptive threshold (decaying from 55% → 20% over 30 seconds), and the server scores it exactly like a typed human guess.
+
+## 🗂️ Project Structure
 
 ```
 NexusDraw/
-├── LICENSE
-├── README.md
+├── backend/                         ← Express + Socket.io API
+│   ├── server.js                      Entry point
+│   ├── package.json
+│   ├── Dockerfile
+│   ├── .env.example
+│   ├── src/
+│   │   ├── utils.js                   Input sanitisation & settings validation
+│   │   └── game/
+│   │       ├── constants.js           CNN categories, word pools
+│   │       ├── wordPicker.js          Word selection per difficulty/AI mode
+│   │       ├── botDrawing.js          Procedural stroke generation for bot turns
+│   │       ├── roomManager.js         Room CRUD & player lookup
+│   │       ├── gameLoop.js            Rounds, timer, scoring, hint reveals
+│   │       └── socketHandlers.js      All Socket.io event handlers
+│   └── tests/                         Jest test suite
+│       ├── utils.test.js
+│       ├── wordPicker.test.js
+│       ├── roomManager.test.js
+│       └── gameLoop.test.js
+├── frontend/                        ← React + Vite
+│   ├── index.html
+│   ├── vite.config.js                 Dev proxy for Socket.io
+│   ├── package.json
+│   ├── Dockerfile                     Multi-stage: Vite build → Nginx
+│   ├── nginx.conf                     WebSocket proxy config
+│   ├── public/
+│   │   ├── favicon.svg                App icon
+│   │   ├── icons.svg                  UI icon sprite
+│   │   └── model/                     Trained CNN (model.json + weight shard)
+│   └── src/
+│       ├── main.jsx                   React entry point
+│       ├── App.jsx                    Global state, screen routing, event dispatch
+│       ├── hooks/
+│       │   ├── useSocket.js           Socket.io connection & events
+│       │   ├── useCanvas.js           Drawing, undo, fill, cursor
+│       │   └── useAI.js              TF.js model loading & inference pipeline
+│       ├── components/
+│       │   ├── HomeScreen.jsx         Name input, create/join tabs
+│       │   ├── LobbyScreen.jsx        Player grid, settings, start
+│       │   ├── WordSelectScreen.jsx   Word cards or "waiting" animation
+│       │   ├── GameScreen.jsx         Canvas + toolbar + sidebar layout
+│       │   ├── GameEndScreen.jsx      Podium + leaderboard + confetti
+│       │   ├── Canvas.jsx             Canvas element + AI chip
+│       │   ├── Toolbar.jsx            Colour palette, brush sizes, tools
+│       │   ├── Sidebar.jsx            Player list + chat panel
+│       │   ├── RoundResult.jsx        Round end overlay
+│       │   ├── PlayerCard.jsx         Lobby player card
+│       │   └── Toast.jsx              Toast notifications
+│       ├── styles/
+│       │   └── index.css              Global styles (semantic class names)
+│       └── utils/
+│           └── helpers.js             Shared constants & utility functions
 ├── model_training/
-│   ├── nexus_draw_cnn.ipynb   ← Train the CNN & export it to TF.js
-│   ├── best_model.keras       ← Best checkpoint saved during training
-│   └── temp_export.h5
-└── nexus-draw/                ← The game itself
-    ├── server.js                Express + Socket.io game server (no ML)
-    ├── index.html                Entire frontend: canvas, UI, TF.js inference
-    ├── package.json
-    ├── .env.example
-    └── model/                   Trained model, generated by the notebook
-        ├── model.json
-        └── group1-shard1of1.bin
+│   └── nexus_draw_cnn.ipynb         ← Train the CNN in Google Colab
+├── docker-compose.yml               ← Orchestrates both services
+├── README.md
+├── LICENSE
+└── .gitignore
 ```
 
-## 🚀 Getting started
+## 🚀 Getting Started
 
-Requires **Node.js ≥ 18**. A trained model is already committed under `nexus-draw/model/`, so you can run the game immediately without training anything yourself.
+Requires **Node.js ≥ 18**. A trained model is already committed under `frontend/public/model/`, so you can run the game immediately.
+
+### Option 1: Run Locally (Development)
 
 ```bash
-git clone https://github.com/Khusu0511/NexusDraw.git
-cd NexusDraw/nexus-draw
+# Terminal 1 — Backend
+cd backend
 npm install
-npm start          # or: npm run dev  (auto-restarts via nodemon)
+npm run dev          # Express + Socket.io on :3001
+
+# Terminal 2 — Frontend
+cd frontend
+npm install
+npm run dev          # Vite dev server on :5173 (proxies /socket.io to :3001)
 ```
 
-Open **http://localhost:3001** — the CNN loads in the background, then create or join a room.
+Open **http://localhost:5173** — the Vite dev server proxies WebSocket connections to the backend automatically.
 
-Copy `.env.example` to `.env` if you want to customize the port:
+### Option 2: Docker (Production)
 
 ```bash
-PORT=3001
-NODE_ENV=production
+docker-compose up --build
 ```
 
-### Retraining the model (optional)
+Open **http://localhost** — Nginx serves the React build and proxies WebSocket to the backend.
 
-Only needed if you want to add/change categories, tune accuracy, or dig into the pipeline.
+### Option 3: Single-Server Production
 
 ```bash
-cd model_training
-jupyter notebook nexus_draw_cnn.ipynb
+cd frontend && npm install && npm run build    # Build React → frontend/dist/
+cd ../backend && npm install
+NODE_ENV=production npm start                  # Serves API + frontend/dist/ on :3001
 ```
 
-Running all cells downloads the Quick Draw `.npy` bitmaps (cached locally after the first run), trains for up to 50 epochs with early stopping and checkpointing, and writes the exported model straight into `nexus-draw/model/`. Refresh the browser afterward to pick up the new weights.
+Open **http://localhost:3001** — the backend serves the built React app as static files.
 
-## 🎮 How to play
+## 🧪 Testing
+
+```bash
+cd backend
+npm test
+```
+
+Runs the Jest test suite (44 tests) covering:
+- **Utilities** — input sanitisation, settings validation, initials extraction
+- **Word picker** — difficulty filtering, AI-mode restriction, no duplicates
+- **Room manager** — code generation, CRUD, player/bot lookup, snapshot sanitisation
+- **Game loop** — scoring formula, hint generation, guess matching rules
+
+## 🧠 Retraining the Model
+
+The model is trained in **Google Colab** (free GPU) for best results:
+
+### Steps
+
+1. **Open Google Colab** — go to [colab.research.google.com](https://colab.research.google.com) and create a new notebook
+2. **Set GPU runtime** — click *Runtime → Change runtime type → T4 GPU → Save*
+3. **Upload the notebook** — upload `model_training/nexus_draw_cnn.ipynb` or paste the training code
+4. **Run all cells** — downloads Quick Draw data (~5 min), trains the CNN (~15-25 min), and exports to TF.js format
+5. **Download the model** — a `nexusdraw_model.zip` will auto-download containing `model.json` + `group1-shard1of1.bin`
+6. **Replace model files** — extract the ZIP and copy both files to `frontend/public/model/`, replacing the existing ones
+7. **Patch for compatibility** — if training with Keras 3, the exported `model.json` uses Keras 3 topology format. Run the patching script to convert it to Keras 2 format that TF.js can load:
+   ```bash
+   python model_training/patch_model_json.py
+   ```
+8. **Refresh the browser** — hard refresh with `Ctrl+Shift+R` to pick up the new weights
+
+### Training Configuration
+
+| Parameter | Default | Notes |
+|-----------|---------|-------|
+| Samples per category | 50,000 | More = better accuracy, slower training |
+| Categories | 25 | Must match `CNN_CATEGORIES` in `frontend/src/utils/helpers.js` |
+| Epochs | 50 | Early stopping at patience=10 |
+| Batch size | 256 | Reduce if GPU OOM |
+| Validation split | 15% | Stratified |
+
+## 🎮 How to Play
 
 1. **Create a room** — pick round count, draw time, difficulty, and whether to add the AI player
 2. **Share the 6-character room code** (or invite link) with friends
@@ -118,22 +242,32 @@ airplane, apple, bicycle, bird, book, butterfly, car, cat, circle, clock, cloud,
 
 ## ☁️ Deployment
 
-The live demo runs on **[Render](https://render.com)**. Since the app lives in the `nexus-draw/` subfolder, point Render at it explicitly:
+### Docker (Recommended)
+
+```bash
+docker-compose up -d --build
+```
+
+This runs the backend on port 3001 and the frontend Nginx on port 80.
+
+### Render / Railway / Fly.io
+
+Since the app has a `backend/` and `frontend/` split, configure two services or use the single-server mode:
 
 | Setting | Value |
 |---|---|
-| Root directory | `nexus-draw` |
-| Build command | `npm install` |
-| Start command | `npm start` |
+| Root directory | `backend` |
+| Build command | `cd ../frontend && npm install && npm run build && cd ../backend && npm install` |
+| Start command | `NODE_ENV=production node server.js` |
 
 [![Deploy to Render](https://render.com/images/deploy-to-render-button.svg)](https://render.com/deploy?repo=https://github.com/Khusu0511/NexusDraw)
 
-It'll run anywhere that hosts a Node + WebSocket app (Railway, Fly.io, a VPS behind Nginx, etc.) — just make sure the platform forwards WebSocket upgrade headers so Socket.io can connect.
+Make sure your platform forwards WebSocket upgrade headers so Socket.io can connect.
 
 ## 🤝 Contributing
 
 Issues and PRs are welcome. Good first contributions:
-- New categories — retrain the notebook, then teach the bot to draw the new word by adding a case to `genStrokes()` in `server.js`
+- New categories — retrain the notebook with additional Quick Draw categories, then teach the bot to draw the new word by adding a case to `genStrokes()` in `backend/src/game/botDrawing.js`
 - Touch support for the canvas
 - Additional or localized word lists
 
