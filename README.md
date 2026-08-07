@@ -200,11 +200,7 @@ The model is trained in **Google Colab / Kaggle** (free GPU) for best results:
 4. **Run all cells** — downloads Quick Draw data (~5 min), trains the CNN (~15-25 min), and exports to TF.js format
 5. **Download the model** — a `nexusdraw_model.zip` will auto-download containing `model.json` + `group1-shard1of1.bin`
 6. **Replace model files** — extract the ZIP and copy both files to `frontend/public/model/`, replacing the existing ones
-7. **Patch for compatibility** — if training with Keras 3, the exported `model.json` uses Keras 3 topology format. Run the patching script to convert it to Keras 2 format that TF.js can load:
-   ```bash
-   python model_training/patch_model_json.py
-   ```
-8. **Refresh the browser** — hard refresh with `Ctrl+Shift+R` to pick up the new weights
+7. **Refresh the browser** — hard refresh with `Ctrl+Shift+R` to pick up the new weights
 
 ### Training Configuration
 
