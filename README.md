@@ -42,7 +42,7 @@ Nexus Draw is a Pictionary-style party game. One player draws a secret word whil
 | **Frontend** | React 19, Vite 8, Canvas API |
 | **Backend** | Node.js, Express 4, Socket.io 4 |
 | **AI Inference** | TensorFlow.js 4.22 (client-side) |
-| **ML Training** | Python, TensorFlow/Keras 3, Google Colab |
+| **ML Training** | Python, TensorFlow/Keras 3, Kaggle |
 | **Containerization** | Docker, docker-compose, Nginx |
 | **Deployment** | Render (Node + WebSocket) |
 
@@ -50,7 +50,7 @@ Nexus Draw is a Pictionary-style party game. One player draws a secret word whil
 
 ### Training
 
-The CNN is trained in Google Colab using the notebook at `model_training/nexus_draw_cnn.ipynb`. It downloads **50,000 real doodles per category** from the [Quick Draw dataset](https://quickdraw.withgoogle.com/data) (25 categories, 1.25 million drawings total) and trains a compact CNN:
+The CNN is trained in Kaggle using the notebook at `model_training/nexus_draw_cnn.ipynb`. It downloads **50,000 real doodles per category** from the [Quick Draw dataset](https://quickdraw.withgoogle.com/data) (25 categories, 1.25 million drawings total) and trains a compact CNN:
 
 - **Architecture**: Three convolutional blocks (32 → 64 → 128 filters) with batch normalization, ReLU activation, max-pooling, and dropout, followed by global average pooling, a 512-unit dense head with batch norm and dropout, and a 25-class softmax output
 - **Augmentation**: Random rotation (±12°), zoom (±15%), translation (±10%), and contrast (±15%)
@@ -130,7 +130,7 @@ NexusDraw/
 │       └── utils/
 │           └── helpers.js             Shared constants & utility functions
 ├── model_training/
-│   └── nexus_draw_cnn.ipynb         ← Train the CNN in Google Colab
+│   └── nexus_draw_cnn.ipynb         ← Train the CNN in Kaggle
 ├── docker-compose.yml               ← Orchestrates both services
 ├── README.md
 ├── LICENSE
@@ -190,12 +190,12 @@ Runs the Jest test suite (44 tests) covering:
 
 ## 🧠 Retraining the Model
 
-The model is trained in **Google Colab** (free GPU) for best results:
+The model is trained in **Google Colab / Kaggle** (free GPU) for best results:
 
 ### Steps
 
-1. **Open Google Colab** — go to [colab.research.google.com](https://colab.research.google.com) and create a new notebook
-2. **Set GPU runtime** — click *Runtime → Change runtime type → T4 GPU → Save*
+1. **Open Kaggle** — go to [kaggle.com](https://www.kaggle.com/) and create a new notebook
+2. **Set GPU runtime** — click *Settings → Accelerator → GPU → T4 GPU → Save*
 3. **Upload the notebook** — upload `model_training/nexus_draw_cnn.ipynb` or paste the training code
 4. **Run all cells** — downloads Quick Draw data (~5 min), trains the CNN (~15-25 min), and exports to TF.js format
 5. **Download the model** — a `nexusdraw_model.zip` will auto-download containing `model.json` + `group1-shard1of1.bin`
